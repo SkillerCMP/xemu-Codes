@@ -767,9 +767,9 @@ static void *vblank_timer_thread(void *opaque)
         }
 
         if (!qatomic_read(&qemu_exiting)) {
-            xemu_main_loop_lock();
+            bql_lock();
             process_vblank(scon);
-            xemu_main_loop_unlock();
+            bql_unlock();
         }
     }
 
