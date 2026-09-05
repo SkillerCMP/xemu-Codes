@@ -134,17 +134,16 @@ static void voice_off(MCPXAPUState *d, uint16_t v)
 static void voice_lock(MCPXAPUState *d, uint16_t v, bool lock)
 {
     assert(v < MCPX_HW_MAX_VOICES);
-    qemu_mutex_lock(&d->lock);
 
-    uint64_t mask = 1LL << (v % 64);
+ /* Keep guest voice-lock MMIO from blocking on the APU frame mutex. */
+    uint64_t mask = 1ULL << (v % 64);
     if (lock) {
-        d->vp.voice_locked[v / 64] |= mask;
+        qatomic_or(&d->vp.voice_locked[v / 64], mask);
     } else {
-        d->vp.voice_locked[v / 64] &= ~mask;
+        qatomic_and(&d->vp.voice_locked[v / 64], ~mask);
     }
 
     qemu_cond_signal(&d->cond);
-    qemu_mutex_unlock(&d->lock);
 }
 
 static bool is_voice_locked(MCPXAPUState *d, uint16_t v)
@@ -1874,7 +1873,9 @@ void mcpx_apu_vp_reset(MCPXAPUState *d)
     memset(d->vp.ssl, 0, sizeof(d->vp.ssl));
     memset(d->vp.hrtf_submix, 0, sizeof(d->vp.hrtf_submix));
     memset(d->vp.submix_headroom, 0, sizeof(d->vp.submix_headroom));
-    memset(d->vp.voice_locked, 0, sizeof(d->vp.voice_locked));
+    for (size_t i = 0; i < ARRAY_SIZE(d->vp.voice_locked); i++) {
+        qatomic_set(&d->vp.voice_locked[i], 0);
+    }
     for (int v = 0; v < ARRAY_SIZE(d->vp.filters); v++) {
         hrtf_filter_init(&d->vp.filters[v].hrtf);
     }
