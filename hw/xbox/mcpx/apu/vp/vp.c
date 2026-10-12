@@ -135,7 +135,7 @@ static void voice_lock(MCPXAPUState *d, uint16_t v, bool lock)
 {
     assert(v < MCPX_HW_MAX_VOICES);
 
- /* Keep guest voice-lock MMIO from blocking on the APU frame mutex. */
+    /* Keep guest voice-lock MMIO from blocking on the APU frame mutex. */
     uint64_t mask = 1ULL << (v % 64);
     if (lock) {
         qatomic_or(&d->vp.voice_locked[v / 64], mask);
